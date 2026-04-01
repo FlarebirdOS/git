@@ -1,6 +1,6 @@
 pkgname=git
-pkgver=2.51.0
-pkgrel=2
+pkgver=2.53.0
+pkgrel=3
 pkgdesc="the fast distributed version control system"
 arch=('x86_64')
 url="https://git-scm.com/"
@@ -8,22 +8,24 @@ license=('GPL-2.0-only')
 depends=(
     'curl'
     'expat'
-    'grep'
-    'openssl'
-    'pcre2'
     'perl'
     'perl-error'
     'perl-mailtools'
+    'openssl'
+    'pcre2'
+    'grep'
     'shadow'
-    'zlib'
+    'zlib-ng'
 )
 makedepends=(
     'python'
-    'python-asciidoc'
     'xmlto'
+    'python-asciidoc'
+    'git'
+    'rust'
 )
 source=(https://www.kernel.org/pub/software/scm/${pkgname}/${pkgname}-${pkgver}.tar.xz)
-sha256sums=(60a7c2251cc2e588d5cd87bae567260617c6de0c22dca9cdbfc4c7d2b8990b62)
+sha256sums=(5818bd7d80b061bbbdfec8a433d609dc8818a05991f731ffc4a561e2ca18c653)
 
 build() {
     cd ${pkgname}-${pkgver}
@@ -43,12 +45,15 @@ build() {
     export MAN_BOLD_LITERAL=1
     export NO_PERL_CPAN_FALLBACKS=1
     export USE_LIBPCRE2=1
+    export ZLIB_NG=1
+    export WITH_RUST=1
 
     ./configure "${configure_args[@]}"
 
-    make
-    make html
-    make man
+    make all man
+    make -C contrib/credential/libsecret
+    make -C contrib/subtree all man
+    make -C contrib/diff-highlight
 }
 
 package() {
@@ -66,6 +71,16 @@ package() {
     # fancy git prompt
     install -vdm755 ${pkgdir}/usr/share/git/
     install -m 0644 ./contrib/completion/git-prompt.sh ${pkgdir}/usr/share/git/git-prompt.sh
+
+    # libsecret credentials helper
+    install -m 0755 contrib/credential/libsecret/git-credential-libsecret ${pkgdir}/usr/libexec/git-core/git-credential-libsecret
+
+    make -C contrib/credential/libsecret clean
+    # subtree installation
+    make -C contrib/subtree DESTDIR=${pkgdir} install install-man
+    # the rest of the contrib stuff
+    find contrib/ -name '.gitignore' -delete
+    cp -a ./contrib/* ${pkgdir}/usr/share/git/
 
     install -vdm755 ${pkgdir}/usr/share/doc/${pkgname}-${pkgver}/man-pages/{html,text}
     mv ${pkgdir}/usr/share/doc/${pkgname}-${pkgver}/{git*.adoc,man-pages/text}
